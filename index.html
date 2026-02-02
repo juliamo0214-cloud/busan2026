@@ -21,17 +21,18 @@
         .info-card-3 { background: #f5fffa; border-left: 8px solid #98fb98; }
         .info-card-4 { background: #fffaf0; border-left: 8px solid #ffdab9; }
         .info-card-5 { background: #f8f8ff; border-left: 8px solid #e6e6fa; }
+        .admin-glow { text-shadow: 0 0 10px rgba(255,143,163,0.5); }
     </style>
 </head>
 <body class="watercolor-bg min-h-screen pb-48">
     <div id="app" v-cloak class="max-w-md mx-auto px-5 pt-8">
         
         <header class="flex justify-between items-center mb-6">
-            <div>
-                <h1 class="text-2xl font-black text-[#ff8fa3]">{{ tabTitle }}</h1>
+            <div @touchstart="startPress" @touchend="endPress" @mousedown="startPress" @mouseup="endPress">
+                <h1 class="text-2xl font-black text-[#ff8fa3]" :class="{'admin-glow': isManager}">{{ tabTitle }}</h1>
                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Busan 2026 / {{ currentTimeDisplay }}</p>
             </div>
-            <button @click="openMainModal" class="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center text-[#ff8fa3] active:scale-90 transition">
+            <button v-if="isManager" @click="openMainModal" class="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center text-[#ff8fa3] active:scale-90 transition">
                 <i data-lucide="plus"></i>
             </button>
         </header>
@@ -49,7 +50,7 @@
                 <div class="flex items-center gap-4">
                     <div class="text-orange-400" :class="{'animate-pulse': loadingWeather}"><i :data-lucide="getWeatherIcon(selectedDayIdx)"></i></div>
                     <div>
-                        <h4 class="text-[10px] font-black text-gray-400 uppercase">{{ loadingWeather ? '正在定位天氣...' : (selectedDayIdx < 3 ? '🔴 釜山即時預報' : '⚪ 智慧回退預測') }}</h4>
+                        <h4 class="text-[10px] font-black text-gray-400 uppercase">{{ loadingWeather ? '釜山搜尋中' : '🔴 釜山即時預報' }}</h4>
                         <div class="flex items-baseline gap-2">
                             <span class="text-xl font-black text-gray-700">{{ weatherForecast[selectedDayIdx].temp }}</span>
                             <span class="text-[10px] font-bold text-gray-400">{{ weatherForecast[selectedDayIdx].cond }}</span>
@@ -70,7 +71,7 @@
                             <span class="text-xs font-black text-pink-400">{{ item.time }}</span>
                             <span v-if="item.tagName" :class="getTagClass(item.tagColor)" class="text-[8px] px-2 py-0.5 rounded text-white font-bold">{{ item.tagName }}</span>
                         </div>
-                        <div class="flex gap-3">
+                        <div v-if="isManager" class="flex gap-3">
                             <button @click="editItinerary(item.originalIdx)" class="text-blue-300"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                             <button @click="deleteItinerary(item.originalIdx)" class="text-red-200"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </div>
@@ -98,19 +99,13 @@
                     <div class="text-right"><p class="text-[10px] font-black opacity-80 uppercase tracking-widest">總台幣估算</p><h2 class="text-xl font-bold">NT$ {{ dayTotalTWD.toLocaleString() }}</h2></div>
                 </div>
             </div>
-
             <div class="space-y-3">
                 <div v-for="(exp, idx) in currentDayExpenses" :key="idx" class="app-card p-5 flex justify-between items-center">
                     <div class="flex-grow">
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm font-black text-gray-800">₩ {{ exp.amount.toLocaleString() }}</span>
-                            <span class="text-[10px] font-bold text-blue-400">≈ NT$ {{ Math.round(exp.amount * exchangeRate) }}</span>
-                        </div>
-                        <p class="text-[10px] text-gray-400 mt-1">
-                            <span class="bg-gray-100 px-1 rounded">{{ exp.category }}</span> {{ exp.time }} | {{ exp.desc }}
-                        </p>
+                        <div class="flex items-center gap-2"><span class="text-sm font-black text-gray-800">₩ {{ exp.amount.toLocaleString() }}</span></div>
+                        <p class="text-[10px] text-gray-400 mt-1">{{ exp.category }} | {{ exp.desc }}</p>
                     </div>
-                    <div class="flex gap-4">
+                    <div v-if="isManager" class="flex gap-4">
                         <button @click="editExpense(idx)" class="text-blue-300"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
                         <button @click="deleteExpense(idx)" class="text-red-200"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </div>
@@ -121,26 +116,22 @@
         <main v-if="activeTab === 'info'" class="space-y-4">
             <div v-for="(info, idx) in travelInfo" :key="idx" :class="['app-card p-6 relative overflow-hidden', 'info-card-' + ((idx % 5) + 1)]">
                 <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-black text-gray-700 flex items-center gap-2">
-                        <i :data-lucide="info.icon || 'file-text'" class="w-5 h-5 text-gray-400"></i> {{ info.title }}
-                    </h3>
-                    <div class="flex gap-3">
+                    <h3 class="font-black text-gray-700 flex items-center gap-2">{{ info.title }}</h3>
+                    <div v-if="isManager" class="flex gap-3">
                         <button @click="editInfo(idx)" class="text-blue-400"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                         <button @click="deleteInfo(idx)" class="text-red-300"><i data-lucide="x" class="w-4 h-4"></i></button>
                     </div>
                 </div>
-                <div class="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{{ info.content }}</div>
-                <div class="absolute -bottom-2 -right-2 opacity-5 font-black text-4xl italic select-none">{{ info.title }}</div>
+                <div class="text-sm text-gray-600 whitespace-pre-wrap">{{ info.content }}</div>
             </div>
-            
-            <button @click="addNewInfoField" class="w-full py-6 border-2 border-dashed border-pink-200 rounded-[28px] text-pink-300 font-black text-sm flex items-center justify-center gap-2 hover:bg-pink-50 transition">
-                <i data-lucide="plus-circle"></i> ＋ 新增資訊備忘錄
+            <button v-if="isManager" @click="addNewInfoField" class="w-full py-6 border-2 border-dashed border-pink-200 rounded-[28px] text-pink-300 font-black text-sm flex items-center justify-center gap-2">
+                ＋ 新增資訊
             </button>
         </main>
 
         <div v-if="showModal" class="fixed inset-0 z-[100] flex items-end justify-center">
             <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showModal = false"></div>
-            <div class="bg-white w-full rounded-t-[40px] p-8 pb-12 z-10 animate-slide-up max-h-[95vh] overflow-y-auto">
+            <div class="bg-white w-full rounded-t-[40px] p-8 pb-12 z-10 max-h-[95vh] overflow-y-auto">
                 <h2 class="text-center font-black text-gray-700 mb-6 text-lg">{{ modalTitle }}</h2>
                 
                 <div v-if="modalMode === 'itinerary'" class="space-y-4">
@@ -148,167 +139,144 @@
                         <select v-model="itineraryForm.day" class="p-4 bg-gray-50 rounded-2xl text-sm font-bold"><option v-for="(d,i) in itinerary" :value="i">Day {{i+1}}</option></select>
                         <input v-model="itineraryForm.time" type="time" class="p-4 bg-gray-50 rounded-2xl text-sm font-bold">
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <select v-model="itineraryForm.type" class="p-4 bg-gray-50 rounded-2xl text-sm font-bold"><option>景點</option><option>餐廳</option><option>交通</option><option>購物</option></select>
-                        <input v-model="itineraryForm.location" placeholder="地點名稱" class="p-4 bg-gray-50 rounded-2xl text-sm font-bold">
-                    </div>
-                    <div class="p-4 bg-gray-50 rounded-2xl flex gap-2">
-                        <input v-model="itineraryForm.tagName" placeholder="標籤文字 (如: 必去)" class="flex-grow p-2 bg-white rounded-lg text-xs font-bold">
-                        <button v-for="c in ['pink','blue','yellow']" @click="itineraryForm.tagColor = c" :class="[itineraryForm.tagColor===c?'ring-2 ring-gray-400':'', getTagClass(c)]" class="w-8 h-8 rounded"></button>
-                    </div>
-                    <textarea v-model="itineraryForm.desc" placeholder="備註、故事..." class="w-full p-4 bg-gray-50 rounded-2xl text-sm h-24"></textarea>
-                    <div class="p-4 bg-pink-50 rounded-2xl grid grid-cols-2 gap-2">
-                        <select v-model="itineraryForm.transitWay" class="bg-white p-3 rounded-xl text-xs"><option>步行</option><option>計程車</option><option>飛機</option><option>巴士</option><option>地鐵</option></select>
-                        <input v-model.number="itineraryForm.transitTime" type="number" placeholder="分鐘" class="bg-white p-3 rounded-xl text-xs">
-                    </div>
-                    <button @click="saveItinerary" class="w-full py-4 bg-[#ff8fa3] text-white rounded-2xl font-black">儲存行程</button>
+                    <input v-model="itineraryForm.location" placeholder="地點名稱" class="w-full p-4 bg-gray-50 rounded-2xl text-sm font-bold">
+                    <textarea v-model="itineraryForm.desc" placeholder="備註..." class="w-full p-4 bg-gray-50 rounded-2xl text-sm h-24"></textarea>
+                    <button @click="saveItinerary" class="w-full py-4 bg-[#ff8fa3] text-white rounded-2xl font-black">儲存並同步雲端</button>
                 </div>
 
                 <div v-if="modalMode === 'budget'" class="space-y-4">
-                    <div class="grid grid-cols-2 gap-2">
-                        <input v-model="expenseForm.date" type="date" class="p-4 bg-gray-50 rounded-2xl text-xs">
-                        <input v-model="expenseForm.time" type="time" class="p-4 bg-gray-50 rounded-2xl text-xs">
-                    </div>
-                    <select v-model="expenseForm.category" class="w-full p-4 bg-gray-50 rounded-2xl text-sm font-bold">
-                        <option>觀光</option><option>交通</option><option>購物</option><option>飲食</option><option>雜項</option><option>其他</option>
-                    </select>
                     <input v-model.number="expenseForm.amount" type="number" class="w-full p-4 bg-gray-50 rounded-2xl text-lg font-black" placeholder="₩ 韓元金額">
-                    <input v-model="expenseForm.desc" placeholder="消費內容說明" class="w-full p-4 bg-gray-50 rounded-2xl text-sm">
-                    <button @click="saveExpense" class="w-full py-4 bg-[#ff8fa3] text-white rounded-2xl font-black">儲存支出</button>
+                    <input v-model="expenseForm.desc" placeholder="項目" class="w-full p-4 bg-gray-50 rounded-2xl text-sm">
+                    <button @click="saveExpense" class="w-full py-4 bg-[#ff8fa3] text-white rounded-2xl font-black">儲存並同步雲端</button>
                 </div>
 
                 <div v-if="modalMode === 'info'" class="space-y-4">
-                    <input v-model="infoForm.title" placeholder="資訊標題" class="w-full p-4 bg-gray-50 rounded-2xl text-sm font-black">
+                    <input v-model="infoForm.title" placeholder="標題" class="w-full p-4 bg-gray-50 rounded-2xl text-sm font-black">
                     <textarea v-model="infoForm.content" placeholder="內容..." class="w-full p-4 bg-gray-50 rounded-2xl text-sm h-64"></textarea>
-                    <button @click="saveInfo" class="w-full py-4 bg-[#ff8fa3] text-white rounded-2xl font-black">更新資訊</button>
+                    <button @click="saveInfo" class="w-full py-4 bg-[#ff8fa3] text-white rounded-2xl font-black">儲存並同步雲端</button>
                 </div>
             </div>
         </div>
 
         <nav class="fixed bottom-6 left-8 right-8 h-20 bg-white/90 backdrop-blur-xl rounded-full flex justify-around items-center px-4 shadow-2xl z-[90]">
-            <button v-for="t in [['itinerary','calendar','行程'],['budget','banknote','記帳'],['info','shield-info','資訊']]" :key="t[0]" @click="activeTab = t[0]" :class="{'text-[#ff8fa3]': activeTab === t[0]}" class="flex flex-col items-center text-gray-300">
+            <button v-for="t in [['itinerary','calendar','行程'],['budget','banknote','記帳'],['info','info','資訊']]" :key="t[0]" @click="activeTab = t[0]" :class="{'text-[#ff8fa3]': activeTab === t[0]}" class="flex flex-col items-center text-gray-300">
                 <i :data-lucide="t[1]"></i><span class="text-[9px] font-bold mt-1 uppercase">{{t[2]}}</span>
             </button>
         </nav>
     </div>
 
     <script>
-        const { createApp, ref, computed, watch, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, watch } = Vue;
+        // 這裡填入你的 Firebase 網址
+        const DB_BASE_URL = "https://busan2026-7887a-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
         createApp({
             setup() {
+                const isManager = ref(localStorage.getItem('busan_admin') === 'true');
+                const pressTimer = ref(null);
                 const activeTab = ref('itinerary');
                 const selectedDayIdx = ref(0);
                 const showModal = ref(false);
                 const modalMode = ref('itinerary');
                 const editingIdx = ref(null);
-                const exchangeRate = ref(0.0242);
                 const loadingWeather = ref(true);
                 const now = ref(new Date());
 
-                const itinerary = ref(JSON.parse(localStorage.getItem('busan_v20')) || [
-                    { date: '2026/03/31', items: [], expenses: [] }, { date: '2026/04/01', items: [], expenses: [] }, { date: '2026/04/02', items: [], expenses: [] }, { date: '2026/04/03', items: [], expenses: [] }, { date: '2026/04/04', items: [], expenses: [] }
-                ]);
-
-                const travelInfo = ref(JSON.parse(localStorage.getItem('busan_info_v20')) || [
-                    { title: '航班資訊', icon: 'plane', content: 'JX822 09:00' }, { title: '住宿資訊', icon: 'home', content: '西面飯店' }, { title: '緊急聯絡', icon: 'phone', content: '112 / 119' }, { title: '物品清單', icon: 'check-square', content: '護照、網卡' }, { title: '其他提醒', icon: 'bell', content: '溫差大' }
-                ]);
-
-                // 初始天氣預設值
-                const weatherForecast = ref([{ temp: '--°C', cond: '載入中', rain: '0', sakura: '開始' }, { temp: '--°C', cond: '載入中', rain: '0', sakura: '盛開' }, { temp: '--°C', cond: '載入中', rain: '0', sakura: '盛開' }, { temp: '--°C', cond: '載入中', rain: '0', sakura: '滿開' }, { temp: '--°C', cond: '載入中', rain: '0', sakura: '吹雪' }]);
+                const itinerary = ref([{ date: '2026/03/31', items: [], expenses: [] }, { date: '2026/04/01', items: [], expenses: [] }, { date: '2026/04/02', items: [], expenses: [] }, { date: '2026/04/03', items: [], expenses: [] }, { date: '2026/04/04', items: [], expenses: [] }]);
+                const travelInfo = ref([{ title: '航班資訊', content: 'JX822 09:00' }, { title: '住宿資訊', content: '西面飯店' }]);
+                const weatherForecast = ref(Array(5).fill({ temp: '--°C', cond: '搜尋中', sakura: '預測中' }));
 
                 const itineraryForm = ref({ day: 0, time: '12:00', type: '景點', location: '', desc: '', tagName: '', tagColor: 'pink', transitWay: '步行', transitTime: 10 });
-                const expenseForm = ref({ date: '2026-03-31', amount: 0, category: '飲食', desc: '', time: '12:00' });
+                const expenseForm = ref({ date: '', amount: 0, category: '飲食', desc: '', time: '12:00' });
                 const infoForm = ref({ title: '', content: '', idx: null });
 
-                const checkIsPast = (dayDate, itemTime) => {
-                    const [h, m] = itemTime.split(':').map(Number);
-                    const target = new Date(dayDate); target.setHours(h, m, 0);
-                    return (now.value - target) / 60000 > 30;
+                // 從雲端抓資料
+                const fetchCloudData = async () => {
+                    try {
+                        const r = await fetch(`${DB_BASE_URL}/busan.json`);
+                        const data = await r.json();
+                        if (data) {
+                            itinerary.value = data.itinerary || itinerary.value;
+                            travelInfo.value = data.travelInfo || travelInfo.value;
+                        }
+                    } catch (e) { console.error("同步失敗", e); }
                 };
 
-                const sortedUpcoming = computed(() => (itinerary.value[selectedDayIdx.value].items || []).filter(i => !checkIsPast(itinerary.value[selectedDayIdx.value].date, i.time)).map(i => ({...i, originalIdx: itinerary.value[selectedDayIdx.value].items.indexOf(i)})));
-                const currentDayExpenses = computed(() => itinerary.value[selectedDayIdx.value].expenses || []);
-                const dayTotalKRW = computed(() => currentDayExpenses.value.reduce((s, e) => s + (e.amount || 0), 0));
-                const dayTotalTWD = computed(() => Math.round(dayTotalKRW.value * exchangeRate.value));
-
-                const openMainModal = () => {
-                    modalMode.value = activeTab.value; editingIdx.value = null;
-                    if(modalMode.value === 'budget') expenseForm.value = { date: itinerary.value[selectedDayIdx.value].date.replace(/\//g,'-'), amount: 0, category: '飲食', desc: '', time: '12:00' };
-                    showModal.value = true;
+                // 推送到雲端
+                const syncToCloud = async () => {
+                    if (!isManager.value) return;
+                    await fetch(`${DB_BASE_URL}/busan.json`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ itinerary: itinerary.value, travelInfo: travelInfo.value })
+                    });
                 };
 
+                // 管理員解鎖邏輯
+                const startPress = () => { pressTimer.value = setTimeout(() => {
+                    const pw = prompt("請輸入管理密碼以開啟編輯功能：");
+                    if (pw === '2026') { isManager.value = true; localStorage.setItem('busan_admin', 'true'); }
+                }, 3000); };
+                const endPress = () => { clearTimeout(pressTimer.value); };
+
+                // 天氣邏輯
+                const fetchWeather = async () => {
+                    try {
+                        const r = await fetch('https://wttr.in/Busan?format=j1');
+                        const d = await r.json();
+                        for(let i=0; i<5; i++) {
+                            weatherForecast.value[i] = {
+                                temp: (d.weather[i]?.avgtempC || '15') + '°C',
+                                cond: d.weather[i]?.hourly[4].lang_zh ? d.weather[i].hourly[4].lang_zh[0].value : '晴',
+                                sakura: i < 2 ? '盛開' : '吹雪'
+                            };
+                        }
+                    } finally { loadingWeather.value = false; setTimeout(()=>lucide.createIcons(), 100); }
+                };
+
+                onMounted(() => {
+                    fetchCloudData();
+                    fetchWeather();
+                    setInterval(() => { now.value = new Date(); fetchCloudData(); }, 30000); // 每30秒同步一次
+                    lucide.createIcons();
+                });
+
+                // 原有功能邏輯整合
                 const saveItinerary = () => {
                     if(editingIdx.value !== null) itinerary.value[selectedDayIdx.value].items.splice(editingIdx.value, 1);
                     itinerary.value[itineraryForm.value.day].items.push({...itineraryForm.value, id: Date.now()});
                     itinerary.value[itineraryForm.value.day].items.sort((a,b)=>a.time.localeCompare(b.time));
-                    showModal.value = false;
+                    syncToCloud(); showModal.value = false;
                 };
 
                 const saveExpense = () => {
-                    const targetIdx = itinerary.value.findIndex(d => d.date.replace(/\//g,'-') === expenseForm.value.date);
-                    if(targetIdx === -1) return alert('日期錯誤');
+                    if(!itinerary.value[selectedDayIdx.value].expenses) itinerary.value[selectedDayIdx.value].expenses = [];
                     if(editingIdx.value !== null) itinerary.value[selectedDayIdx.value].expenses.splice(editingIdx.value, 1);
-                    if(!itinerary.value[targetIdx].expenses) itinerary.value[targetIdx].expenses = [];
-                    itinerary.value[targetIdx].expenses.push({...expenseForm.value});
-                    showModal.value = false;
+                    itinerary.value[selectedDayIdx.value].expenses.push({...expenseForm.value});
+                    syncToCloud(); showModal.value = false;
                 };
 
-                const editInfo = (idx) => { modalMode.value='info'; infoForm.value={...travelInfo.value[idx], idx}; showModal.value=true; };
-                const saveInfo = () => { travelInfo.value[infoForm.value.idx] = {...infoForm.value}; showModal.value=false; };
-                const addNewInfoField = () => { modalMode.value='info'; infoForm.value={title:'', content:'', icon:'plus', idx: travelInfo.value.length}; travelInfo.value.push({title:'新備忘', content:''}); showModal.value=true; };
+                const saveInfo = () => { travelInfo.value[infoForm.value.idx] = {...infoForm.value}; syncToCloud(); showModal.value = false; };
 
-                // 核心克服：免 Key 天氣抓取邏輯
-                const fetchAutoWeather = async () => {
-                    try {
-                        // 使用 wttr.in 抓取釜山 JSON 格式天氣
-                        const response = await fetch('https://wttr.in/Busan?format=j1');
-                        const data = await response.json();
-                        
-                        // 更新前三天即時預報
-                        for(let i=0; i<3; i++) {
-                            const dayData = data.weather[i];
-                            weatherForecast.value[i].temp = dayData.avgtempC + '°C';
-                            weatherForecast.value[i].cond = dayData.hourly[4].lang_zh ? dayData.hourly[4].lang_zh[0].value : dayData.hourly[4].weatherDesc[0].value;
-                        }
-                        // 後兩天使用智慧回退預測 (wttr.in 提供 3 天預報)
-                        weatherForecast.value[3].temp = '16°C'; weatherForecast.value[3].cond = '晴';
-                        weatherForecast.value[4].temp = '14°C'; weatherForecast.value[4].cond = '多雲';
-                    } catch (e) {
-                        console.log("Weather fallback triggered");
-                        // 失敗時的回退機制
-                        weatherForecast.value.forEach(w => { if(w.temp === '--°C') w.temp = '15°C'; w.cond = '多雲'; });
-                    } finally {
-                        loadingWeather.value = false;
-                        setTimeout(() => lucide.createIcons(), 100);
-                    }
-                };
-
-                onMounted(() => {
-                    fetch('https://open.er-api.com/v6/latest/KRW').then(r => r.json()).then(d => { if(d.rates.TWD) exchangeRate.value = d.rates.TWD; });
-                    fetchAutoWeather(); // 自動搜尋定位天氣
-                    setInterval(() => now.value = new Date(), 60000);
-                    lucide.createIcons();
-                });
-
-                watch([itinerary, travelInfo], () => {
-                    localStorage.setItem('busan_v20', JSON.stringify(itinerary.value));
-                    localStorage.setItem('busan_info_v20', JSON.stringify(travelInfo.value));
-                    setTimeout(() => lucide.createIcons(), 10);
-                }, { deep: true });
-
-                return { 
-                    activeTab, selectedDayIdx, itinerary, travelInfo, weatherForecast, sortedUpcoming, currentDayExpenses, dayTotalKRW, dayTotalTWD, exchangeRate, showModal, modalMode, itineraryForm, expenseForm, infoForm, loadingWeather,
-                    tabTitle: computed(() => ({ itinerary: '釜山行程', budget: '旅費記帳', info: '旅遊資訊' }[activeTab.value])),
+                return {
+                    isManager, startPress, endPress, activeTab, selectedDayIdx, itinerary, travelInfo, weatherForecast, loadingWeather, showModal, modalMode, itineraryForm, expenseForm, infoForm,
+                    tabTitle: computed(() => ({ itinerary: '釜山智慧助手', budget: '旅費記帳', info: '旅遊資訊' }[activeTab.value])),
                     modalTitle: computed(() => ({ itinerary: '編輯行程', budget: '新增帳務', info: '編輯資訊' }[modalMode.value])),
                     currentTimeDisplay: computed(() => now.value.toLocaleTimeString('zh-TW', {hour12:false, hour:'2-digit', minute:'2-digit'})),
-                    openMainModal, saveItinerary, saveExpense, editInfo, saveInfo, addNewInfoField, deleteInfo: (idx) => travelInfo.value.splice(idx,1), deleteItinerary: (idx) => itinerary.value[selectedDayIdx.value].items.splice(idx,1), deleteExpense: (idx) => itinerary.value[selectedDayIdx.value].expenses.splice(idx,1), editItinerary: (idx) => { modalMode.value='itinerary'; editingIdx.value=idx; itineraryForm.value={...itinerary.value[selectedDayIdx.value].items[idx], day:selectedDayIdx.value}; showModal.value=true; }, editExpense: (idx) => { modalMode.value='budget'; editingIdx.value=idx; expenseForm.value={...currentDayExpenses.value[idx]}; showModal.value=true; },
-                    goMap: (type, loc) => window.open(type === 'naver' ? `https://map.naver.com/v5/search/${encodeURIComponent(loc)}` : `https://www.google.com/maps/search/${encodeURIComponent(loc)}`),
-                    getWeatherIcon: (idx) => {
-                        const c = weatherForecast.value[idx].cond;
-                        if(c.includes('晴') || c.includes('Clear') || c.includes('Sun')) return 'sun';
-                        if(c.includes('雨') || c.includes('Rain')) return 'cloud-rain';
-                        return 'cloud';
-                    },
+                    sortedUpcoming: computed(() => (itinerary.value[selectedDayIdx.value].items || []).map(i => ({...i, originalIdx: itinerary.value[selectedDayIdx.value].items.indexOf(i)}))),
+                    currentDayExpenses: computed(() => itinerary.value[selectedDayIdx.value].expenses || []),
+                    dayTotalKRW: computed(() => (itinerary.value[selectedDayIdx.value].expenses || []).reduce((s, e) => s + (e.amount || 0), 0)),
+                    dayTotalTWD: computed(() => Math.round((itinerary.value[selectedDayIdx.value].expenses || []).reduce((s, e) => s + (e.amount || 0), 0) * 0.024)),
+                    openMainModal: () => { modalMode.value = activeTab.value; editingIdx.value = null; showModal.value = true; },
+                    saveItinerary, saveExpense, saveInfo,
+                    deleteItinerary: (idx) => { itinerary.value[selectedDayIdx.value].items.splice(idx,1); syncToCloud(); },
+                    deleteExpense: (idx) => { itinerary.value[selectedDayIdx.value].expenses.splice(idx,1); syncToCloud(); },
+                    deleteInfo: (idx) => { travelInfo.value.splice(idx,1); syncToCloud(); },
+                    editItinerary: (idx) => { modalMode.value='itinerary'; editingIdx.value=idx; itineraryForm.value={...itinerary.value[selectedDayIdx.value].items[idx], day:selectedDayIdx.value}; showModal.value=true; },
+                    editExpense: (idx) => { modalMode.value='budget'; editingIdx.value=idx; expenseForm.value={...itinerary.value[selectedDayIdx.value].expenses[idx]}; showModal.value=true; },
+                    editInfo: (idx) => { modalMode.value='info'; infoForm.value={...travelInfo.value[idx], idx}; showModal.value=true; },
+                    addNewInfoField: () => { modalMode.value='info'; infoForm.value={title:'', content:'', idx: travelInfo.value.length}; travelInfo.value.push({title:'新備忘', content:''}); showModal.value=true; },
+                    goMap: (type, loc) => window.open(`https://map.naver.com/v5/search/${encodeURIComponent(loc)}`),
+                    getWeatherIcon: (idx) => weatherForecast.value[idx].cond.includes('雨') ? 'cloud-rain' : (weatherForecast.value[idx].cond.includes('雲') ? 'cloud' : 'sun'),
                     getTransitIcon: (way) => ({ '步行': 'person-standing', '計程車': 'car', '飛機': 'plane', '巴士': 'bus', '地鐵': 'train' }[way] || 'move'),
                     getTagClass: (c) => ({ 'pink': 'bg-pink-400', 'blue': 'bg-blue-400', 'yellow': 'bg-yellow-500' }[c] || 'bg-gray-400')
                 };
