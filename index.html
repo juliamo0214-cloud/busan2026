@@ -208,7 +208,6 @@
     </div>
 
     <script>
-        // Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyDS7hpHxfBw_ldwr0i94e7aRZBHyy0s7DU",
             authDomain: "busan-helper.firebaseapp.com",
@@ -222,7 +221,6 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // 用戶 ID 生成 (供私密記帳)
         let userId = localStorage.getItem('busan_uid');
         if (!userId) {
             userId = 'u' + Date.now().toString(36);
@@ -237,23 +235,22 @@
                 const weather = ref({ temp: '--', humidity: '--', wind: '--', desc: '更新中...' });
                 const currentSystemTime = ref('');
                 
-                // 行程 (公共)
-                const itinerary = ref([{ date: '2026/03/31', items: [] }, { date: '2026/04/01', items: [] }, { date: '2026/04/02', items: [] }, { date: '2026/04/03', items: [] }, { date: '2026/04/04', items: [] }]);
+                // 固定五天的日期模板
+                const dateTemplate = ['2026/03/31', '2026/04/01', '2026/04/02', '2026/04/03', '2026/04/04'];
+                const itinerary = ref(dateTemplate.map(d => ({ date: d, items: [] })));
                 const selectedDayIdx = ref(0);
                 
-                // 記帳/資訊 (私密)
                 const expenses = ref([]);
                 const travelInfo = ref([]);
                 const selectedExpDayIdx = ref(0);
 
                 const modals = ref({ itinerary: false, expense: false, info: false });
                 const forms = ref({ 
-                    itinerary: { dateIdx: 0, time: '12:00', category: '景點', location: '', tagText: '', desc: '', transitWay: '地鐵', transitTime: 20 },
+                    itinerary: { dateIdx: 0, time: '12:00', category: '景點', location: '', tagText: '', desc: '', transitWay: '計程車', transitTime: 20 },
                     expense: { date: '2026-03-31', time: '12:00', category: '餐飲', amount: 0, desc: '' },
                     info: { title: '', content: '' }
                 });
 
-                // 管理員權限 (新密碼: momo1985)
                 const handleAdminAuth = () => {
                     if (isAdmin.value) {
                         isAdmin.value = false;
@@ -269,14 +266,19 @@
                     }
                 };
 
-                // Firebase 同步邏輯
                 const initSync = () => {
-                    // 1. 同步公共行程 (所有人都看得到，只有 Admin 能改)
                     db.ref('busan_v32/itinerary').on('value', snap => {
-                        if (snap.val()) itinerary.value = snap.val();
+                        const cloudData = snap.val();
+                        if (cloudData && Array.isArray(cloudData)) {
+                            // 關鍵修正：將雲端資料映射回固定的五天結構中，避免後幾天遺漏
+                            itinerary.value = dateTemplate.map((d, i) => ({
+                                date: d,
+                                items: (cloudData[i] && cloudData[i].items) ? cloudData[i].items : []
+                            }));
+                        }
                         nextTick(() => lucide.createIcons());
                     });
-                    // 2. 同步私密資料 (根據用戶 UID)
+
                     db.ref(`busan_v32/private/${userId}`).on('value', snap => {
                         const data = snap.val() || {};
                         expenses.value = data.expenses || [];
@@ -288,10 +290,10 @@
                 const updateItineraryCloud = () => { if(isAdmin.value) db.ref('busan_v32/itinerary').set(JSON.parse(JSON.stringify(itinerary.value))); };
                 const updatePrivateCloud = (key) => { db.ref(`busan_v32/private/${userId}/${key}`).set(JSON.parse(JSON.stringify(key === 'expenses' ? expenses.value : travelInfo.value))); };
 
-                // 計算與操作
                 const sortedItinerary = computed(() => {
                     const day = itinerary.value[selectedDayIdx.value];
-                    return (day.items || []).map((item, idx) => {
+                    if (!day || !day.items) return [];
+                    return [...day.items].map((item, idx) => {
                         const [h, m] = item.time.split(':');
                         const itemTime = new Date(day.date); itemTime.setHours(h, m, 0);
                         return { ...item, isPast: (new Date() - itemTime) > 30 * 60 * 1000, originalIdx: idx };
@@ -299,7 +301,8 @@
                 });
 
                 const dailyExpenses = computed(() => {
-                    const d = itinerary.value[selectedExpDayIdx.value].date.replace(/\//g, '-');
+                    const day = itinerary.value[selectedExpDayIdx.value];
+                    const d = day.date.replace(/\//g, '-');
                     return expenses.value.filter(e => e.date === d);
                 });
 
@@ -307,7 +310,14 @@
                 const dailyTotalTWD = computed(() => Math.round(dailyTotalKRW.value * 0.024));
                 const pageTitle = computed(() => ({ itinerary: '行程規劃', expense: '個人預算', info: '個人備忘' }[activeTab.value]));
 
-                const saveItinerary = () => { itinerary.value[forms.value.itinerary.dateIdx].items.push({...forms.value.itinerary}); closeAllModals(); updateItineraryCloud(); };
+                const saveItinerary = () => { 
+                    const idx = forms.value.itinerary.dateIdx;
+                    if (!itinerary.value[idx].items) itinerary.value[idx].items = [];
+                    itinerary.value[idx].items.push({...forms.value.itinerary}); 
+                    closeAllModals(); 
+                    updateItineraryCloud(); 
+                };
+
                 const deleteItinerary = (idx) => { if(confirm('刪除這項行程嗎？')){ itinerary.value[selectedDayIdx.value].items.splice(idx, 1); updateItineraryCloud(); } };
                 const saveExpense = () => { expenses.value.push({...forms.value.expense, id: Date.now()}); closeAllModals(); updatePrivateCloud('expenses'); };
                 const deleteExpense = (id) => { expenses.value = expenses.value.filter(e => e.id !== id); updatePrivateCloud('expenses'); };
@@ -323,7 +333,10 @@
                 };
 
                 const setDay = (i) => { if(activeTab.value==='itinerary') selectedDayIdx.value = i; else selectedExpDayIdx.value = i; };
-                const openAddModal = () => modals.value[activeTab.value] = true;
+                const openAddModal = () => {
+                    if(activeTab.value === 'itinerary') forms.value.itinerary.dateIdx = selectedDayIdx.value;
+                    modals.value[activeTab.value] = true;
+                };
                 const closeAllModals = () => Object.keys(modals.value).forEach(k => modals.value[k] = false);
 
                 onMounted(() => {
